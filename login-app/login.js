@@ -62,6 +62,8 @@ module.exports = function(connection) {
         }
     });
     
+    
+    
 
 
     router.post('/newpass', async (req, res) => {
@@ -139,7 +141,86 @@ router.delete('/delete/:id', (req, res) => {
         );
     });
   });
+
+  router.delete('/deletecourse/:id', (req, res) => {
+    const courseId = req.params.id;
   
+    connection.beginTransaction((err) => {
+        if (err) {
+            return res.status(500).json({ message: 'Transaction error', error: err });
+        }
+  
+        connection.query(
+            'DELETE FROM courses WHERE id = ?',
+                [courseId],
+                (err, result) => {
+                    if (err) {
+                        return connection.rollback(() => {
+                            res.status(500).json({ message: 'Error deleting course', error: err });
+                        });
+                    }
+
+            connection.commit((err) => {
+                if (err) {
+                    return connection.rollback(() => {
+                        res.status(500).json({ message: 'Transaction commit error', error: err });
+                    });
+                }
+
+                res.status(200).json({ message: 'Course deleted successfully' });
+            });
+            }
+                
+            
+        );
+    });
+  });
+
+    router.delete('/deletedept/:id', (req, res) => {
+        const deptId = req.params.id;
+
+        connection.beginTransaction((err) => {
+            if (err) {
+                return res.status(500).json({ message: 'Transaction error', error: err });
+            }
+
+            connection.query(
+                'UPDATE employees SET department_id = NULL WHERE department_id = ?',
+                [deptId],
+                (err, result) => {
+                    if (err) {
+                        return connection.rollback(() => {
+                            res.status(500).json({ message: 'Error updating employees', error: err });
+                        });
+                    }
+
+                    connection.query(
+                        'DELETE FROM department WHERE id = ?',
+                        [deptId],
+                        (err, result) => {
+                            if (err) {
+                                return connection.rollback(() => {
+                                    res.status(500).json({ message: 'Error deleting department', error: err });
+                                });
+                            }
+
+                            connection.commit((err) => {
+                                if (err) {
+                                    return connection.rollback(() => {
+                                        res.status(500).json({ message: 'Transaction commit error', error: err });
+                                    });
+                                }
+
+                                res.status(200).json({ message: 'Department deleted successfully' });
+                            });
+                        }
+                    );
+                }
+            );
+        });
+    });
+
+
    
 
     router.post('/resetpassword', async (req, res) => {
@@ -202,7 +283,9 @@ router.delete('/delete/:id', (req, res) => {
         });
     });
 
+
     router.get('/view/:id', (req, res) => {
+        
         const { id } = req.params;
         connection.query('SELECT e.id, e.name,d.dept_name, e.status, e.contact_info, e.age FROM employees e LEFT JOIN department d ON e.department_id = d.id WHERE e.id = ?', [id], (err, results) => {
             if (err) {
@@ -211,6 +294,21 @@ router.delete('/delete/:id', (req, res) => {
             }
             if (results.length === 0) {
                 return res.status(404).json({ message: 'Employee not found' });
+            }
+            res.json(results[0]);
+        });
+    });
+
+    router.get('/viewcourse/:id', (req, res) => {
+        
+        const { id } = req.params;
+        connection.query('SELECT * from courses WHERE id = ?', [id], (err, results) => {
+            if (err) {
+                console.error('Error fetching course:', err);
+                return res.status(500).json({ message: 'Error fetching course' });
+            }
+            if (results.length === 0) {
+                return res.status(404).json({ message: 'Course not found' });
             }
             res.json(results[0]);
         });
@@ -229,6 +327,63 @@ router.delete('/delete/:id', (req, res) => {
                 return res.status(404).json({ message: 'Employee not found' });
             }
             res.status(200).json({ message: 'Employee updated successfully' });
+        });
+    });
+
+    router.put('/updatedept/:id', (req, res) => {
+        const deptId = req.params.id;
+        const { dept_name, hod_id, status } = req.body;
+
+        connection.beginTransaction((err) => {
+            if (err) {
+                return res.status(500).json({ message: 'Transaction error', error: err });
+            }
+
+            connection.query(
+                'UPDATE department SET dept_name = ?, hod_id = ?, status = ? WHERE id = ?',
+                [dept_name, hod_id, status, deptId],
+                (err, result) => {
+                    if (err) {
+                        return connection.rollback(() => {
+                            res.status(500).json({ message: 'Error updating department', error: err });
+                        });
+                    }
+
+                    connection.commit((err) => {
+                        if (err) {
+                            return connection.rollback(() => {
+                                res.status(500).json({ message: 'Transaction commit error', error: err });
+                            });
+                        }
+
+                        res.status(200).json({ message: 'Department updated successfully' });
+                    });
+                }
+            );
+        });
+    });
+
+
+    router.post('/createdept', (req, res) => {
+        const { deptId, name, hodId, status } = req.body;   
+        connection.query('SELECT * FROM department WHERE id = ?', [deptId], (err, results) => {
+            if (err) {
+                console.error('Error checking for duplicate dept:', err);
+                return res.status(500).json({ message: 'Error checking for duplicate dept' });
+            }
+    
+            if (results.length > 0) {
+                return res.status(409).json({ message: 'Department ID already exists' });
+            }
+    
+            connection.query('INSERT INTO department (id, dept_name, hod_id, status) VALUES (?, ?, ?, ?)', 
+            [deptId, name, hodId, status], (err, result) => {
+                if (err) {
+                    console.error('Error creating Department:', err);
+                    return res.status(500).json({ message: 'Error creating Department' });
+                }
+                res.status(201).json({ message: 'Department created successfully' });
+            });
         });
     });
 
