@@ -48,6 +48,14 @@ app.get('/employees', (req, res) => {
     res.json(results);
   });
 });
+app.get('/courselist', (req, res) => {
+  connection.query('select id, course_title, created_at, completions from courses;', (err, results) => {
+    if (err) {
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+    res.json(results);
+  });
+});
 
 app.get('/api/viewdept', (req, res) => {
   const sql = 'SELECT id, dept_name FROM department'; 
@@ -56,6 +64,45 @@ app.get('/api/viewdept', (req, res) => {
       return res.status(500).json({ error: 'Failed to retrieve departments' });
     }
     res.json(result);
+  });
+});
+
+app.get('/api/leaderboard', (req, res) => {
+  const query = `
+      SELECT 
+          e.id,
+          e.name,
+          e.age,
+          e.courses_completed,
+          e.credits_earned,
+          d.dept_name AS department,
+          JSON_ARRAYAGG(
+              JSON_OBJECT(
+                  'course_id', ec.course_id,
+                  'course_title', c.course_title,
+                  'completion_date', ec.completion_date
+              )
+          ) AS completed_courses
+      FROM employees e
+      LEFT JOIN employee_courses ec ON e.id = ec.employee_id
+      LEFT JOIN courses c ON ec.course_id = c.id
+      LEFT JOIN department d ON e.department_id = d.id
+      GROUP BY e.id, e.name, e.age, e.courses_completed, e.credits_earned, d.dept_name
+      HAVING e.courses_completed > 0
+      ORDER BY 
+          e.credits_earned DESC,
+          e.courses_completed DESC,
+          MAX(ec.completion_date) DESC
+      LIMIT 5;
+  `;
+
+  connection.query(query, (error, results) => {
+    if (error) {
+      console.error('Error fetching leaderboard data:', error);
+      res.status(500).send('Error fetching leaderboard data');
+    } else {
+      res.json(results);
+    }
   });
 });
 
@@ -88,12 +135,12 @@ app.get('/api/gethodid', (req, res) => {
 });
 
 app.post('/api/createcourse', upload.single('course_image'), (req, res) => {
-  const { course_title, short_description, source_link, credit_points, status } = req.body;
+  const { course_title, short_description, source_link, credit_points } = req.body;
   const course_image = req.file ? req.file.filename : null;
 
-  const sql = `INSERT INTO courses (course_title, course_image, short_description, source_link, credit_points, status) VALUES (?, ?, ?, ?, ?, ?)`;
+  const sql = `INSERT INTO courses (course_title, course_image, short_description, source_link, credit_points) VALUES (?, ?, ?, ?, ?)`;
 
-  connection.execute(sql, [course_title, course_image, short_description, source_link, credit_points, status], (err, results) => {
+  connection.execute(sql, [course_title, course_image, short_description, source_link, credit_points], (err, results) => {
     if (err) {
       console.error('Error inserting data:', err);
       return res.status(500).json({ error: 'Failed to create course' });
@@ -180,6 +227,46 @@ app.post('/api/updatecourse', upload.single('course_image'), (req, res) => {
     res.status(200).json({ message: 'Course updated successfully' });
   });
 });
+
+app.get('/dashboard', (req, res) => {
+  const dashboardData = {};
+
+  connection.query('SELECT COUNT(id) AS employee_count FROM employees', (err, results) => {
+    if (err) {
+      console.error('Error executing query for employee count:', err);
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
+    dashboardData.employeeCount = results[0].employee_count;
+
+    connection.query("SELECT COUNT(id) AS active_employee_count FROM employees WHERE status = 'active'", (err, results) => {
+      if (err) {
+        console.error('Error executing query for active employee count:', err);
+        return res.status(500).json({ error: 'Internal Server Error' });
+      }
+      dashboardData.activeEmployeeCount = results[0].active_employee_count;
+
+      connection.query("SELECT COUNT(id) AS inactive_employee_count FROM employees WHERE status = 'inactive'", (err, results) => {
+        if (err) {
+          console.error('Error executing query for inactive employee count:', err);
+          return res.status(500).json({ error: 'Internal Server Error' });
+        }
+        dashboardData.inactiveEmployeeCount = results[0].inactive_employee_count;
+
+        connection.query('SELECT COUNT(id) AS courses_count FROM courses', (err, results) => {
+          if (err) {
+            console.error('Error executing query for courses count:', err);
+            return res.status(500).json({ error: 'Internal Server Error' });
+          }
+          dashboardData.coursesCount = results[0].courses_count;
+
+          // All queries completed, send the response
+          res.json(dashboardData);
+        });
+      });
+    });
+  });
+});
+
 
 app.listen(port, () => {
   console.log(`Server started on http://localhost:${port}`);

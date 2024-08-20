@@ -261,25 +261,14 @@ router.delete('/delete/:id', (req, res) => {
 
 
     router.post('/createemployee', (req, res) => {
-        const { employeeId, name, department, status, contact, age } = req.body;   
-        connection.query('SELECT * FROM employees WHERE id = ?', [employeeId], (err, results) => {
+        const { name, department, contact, age } = req.body;     
+        connection.query('INSERT INTO employees (name, department_id, contact_info, age) VALUES (?, ?, ?, ?)', 
+        [name, department, contact, age], (err, result) => {
             if (err) {
-                console.error('Error checking for duplicate employee:', err);
-                return res.status(500).json({ message: 'Error checking for duplicate employee' });
+                console.error('Error creating employee:', err);
+                return res.status(500).json({ message: 'Error creating employee' });
             }
-    
-            if (results.length > 0) {
-                return res.status(409).json({ message: 'Employee ID already exists' });
-            }
-    
-            connection.query('INSERT INTO employees (id, name, department_id, status, contact_info, age) VALUES (?, ?, ?, ?, ?, ?)', 
-            [employeeId, name, department, status, contact, age], (err, result) => {
-                if (err) {
-                    console.error('Error creating employee:', err);
-                    return res.status(500).json({ message: 'Error creating employee' });
-                }
-                res.status(201).json({ message: 'Employee created successfully' });
-            });
+            res.status(201).json({ message: 'Employee created successfully' });
         });
     });
 
@@ -287,7 +276,7 @@ router.delete('/delete/:id', (req, res) => {
     router.get('/view/:id', (req, res) => {
         
         const { id } = req.params;
-        connection.query('SELECT e.id, e.name,d.dept_name, e.status, e.contact_info, e.age FROM employees e LEFT JOIN department d ON e.department_id = d.id WHERE e.id = ?', [id], (err, results) => {
+        connection.query('SELECT e.id, e.name,d.dept_name, e.status, e.contact_info, e.age, e.courses_completed, e.credits_earned FROM employees e LEFT JOIN department d ON e.department_id = d.id WHERE e.id = ?', [id], (err, results) => {
             if (err) {
                 console.error('Error fetching employee:', err);
                 return res.status(500).json({ message: 'Error fetching employee' });
@@ -365,26 +354,16 @@ router.delete('/delete/:id', (req, res) => {
 
 
     router.post('/createdept', (req, res) => {
-        const { deptId, name, hodId, status } = req.body;   
-        connection.query('SELECT * FROM department WHERE id = ?', [deptId], (err, results) => {
+        const { name, hodId } = req.body;       
+        connection.query('INSERT INTO department ( dept_name, hod_id) VALUES (?, ?)', 
+        [name, hodId], (err, result) => {
             if (err) {
-                console.error('Error checking for duplicate dept:', err);
-                return res.status(500).json({ message: 'Error checking for duplicate dept' });
+                console.error('Error creating Department:', err);
+                return res.status(500).json({ message: 'Error creating Department' });
             }
-    
-            if (results.length > 0) {
-                return res.status(409).json({ message: 'Department ID already exists' });
-            }
-    
-            connection.query('INSERT INTO department (id, dept_name, hod_id, status) VALUES (?, ?, ?, ?)', 
-            [deptId, name, hodId, status], (err, result) => {
-                if (err) {
-                    console.error('Error creating Department:', err);
-                    return res.status(500).json({ message: 'Error creating Department' });
-                }
-                res.status(201).json({ message: 'Department created successfully' });
-            });
+            res.status(201).json({ message: 'Department created successfully' });
         });
+    
     });
 
     
